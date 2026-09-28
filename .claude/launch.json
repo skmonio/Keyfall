@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "keyfall", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--port", "5174", "--strictPort"], "port": 5174 }
+  ]
+}

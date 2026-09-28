@@ -1,0 +1,114 @@
+[
+  {
+    "file": "ode-to-joy.musicxml",
+    "title": "Ode to Joy",
+    "composer": "Beethoven",
+    "level": "Beginner",
+    "format": "MusicXML (with fingering)"
+  },
+  {
+    "file": "twinkle.mid",
+    "title": "Twinkle Twinkle Little Star",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MIDI (2 tracks)"
+  },
+  {
+    "file": "au-clair-de-la-lune.musicxml",
+    "title": "Au clair de la lune",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML (with a repeat)"
+  },
+  {
+    "file": "hot-cross-buns.musicxml",
+    "title": "Hot Cross Buns",
+    "composer": "Traditional",
+    "level": "First steps",
+    "format": "MusicXML (with fingering)"
+  },
+  {
+    "file": "frere-jacques.musicxml",
+    "title": "Frère Jacques",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "london-bridge.musicxml",
+    "title": "London Bridge",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "yankee-doodle.musicxml",
+    "title": "Yankee Doodle",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "old-macdonald.musicxml",
+    "title": "Old MacDonald Had a Farm",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "row-your-boat.musicxml",
+    "title": "Row, Row, Row Your Boat",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML (6/8)"
+  },
+  {
+    "file": "mary-had-a-little-lamb.musicxml",
+    "title": "Mary Had a Little Lamb",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML (with fingering)"
+  },
+  {
+    "file": "jingle-bells.musicxml",
+    "title": "Jingle Bells (chorus)",
+    "composer": "J. L. Pierpont",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "amazing-grace.musicxml",
+    "title": "Amazing Grace",
+    "composer": "Traditional",
+    "level": "Beginner",
+    "format": "MusicXML (3/4, pickup)"
+  },
+  {
+    "file": "canon-in-d.musicxml",
+    "title": "Canon in D (simplified)",
+    "composer": "Pachelbel",
+    "level": "Beginner",
+    "format": "MusicXML"
+  },
+  {
+    "file": "fur-elise.musicxml",
+    "title": "Für Elise (opening)",
+    "composer": "Beethoven",
+    "level": "Early intermediate",
+    "format": "MusicXML (3/8)"
+  },
+  {
+    "file": "prelude-in-c.musicxml",
+    "title": "Prelude in C (bars 1–8)",
+    "composer": "J. S. Bach",
+    "level": "Early intermediate",
+    "format": "MusicXML"
+  },
+  {
+    "file": "minuet-in-g.musicxml",
+    "title": "Minuet in G (simplified)",
+    "composer": "Petzold",
+    "level": "Early intermediate",
+    "format": "MusicXML"
+  }
+]
