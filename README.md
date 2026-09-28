@@ -24,6 +24,8 @@ npm install
 npm start            # http://localhost:5173, opens the browser (or double-click KeyFall.command on the Desktop)
 ```
 
+**Online, nothing to install:** KeyFall is published with GitHub Pages at **https://skmonio.github.io/Keyfall/**. Open it in Chrome or Edge on any computer (plug the LUMI in by USB and allow MIDI when asked). Every push to `main` runs the tests, rebuilds and republishes it (`.github/workflows/pages.yml`); the one-time setup is repo **Settings → Pages → Source: GitHub Actions**. Songs, progress and settings are stored per site, so the online copy and a local copy each keep their own.
+
 **One-click start:** double-click **KeyFall.command** (Mac) or **KeyFall.bat** (Windows) in this folder. It installs what's needed the first time, starts KeyFall at http://localhost:5173 and opens the browser; close the window to stop it.
 
 **On another computer:** clone the repo, then use the launcher above (Node.js 20+ needed: https://nodejs.org). Your imported songs, progress and settings live in the browser on each computer, so they don't come along; re-import songs there, and allow the LUMI permission again. On Windows, connect the LUMI with a USB cable (browsers on Windows usually can't see Bluetooth MIDI devices).
