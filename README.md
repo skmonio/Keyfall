@@ -26,7 +26,7 @@ npm start            # http://localhost:5173, opens the browser (or double-click
 
 **One-click start:** double-click **KeyFall.command** (Mac) or **KeyFall.bat** (Windows) in this folder. It installs what's needed the first time, starts KeyFall at http://localhost:5173 and opens the browser; close the window to stop it.
 
-**On another computer:** clone the repo, then use the launcher above (Node.js 20+ needed: https://nodejs.org). Your imported songs, progress and settings live in the browser on each computer, so they don't come along; re-import songs there, and allow the LUMI permission again. On Windows, connect the LUMI with a USB cable (Chrome on Windows doesn't support Bluetooth MIDI).
+**On another computer:** clone the repo, then use the launcher above (Node.js 20+ needed: https://nodejs.org). Your imported songs, progress and settings live in the browser on each computer, so they don't come along; re-import songs there, and allow the LUMI permission again. On Windows, connect the LUMI with a USB cable (browsers on Windows usually can't see Bluetooth MIDI devices).
 
 Other scripts:
 
