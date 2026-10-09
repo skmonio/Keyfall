@@ -515,7 +515,8 @@ export class SheetView {
   update(session: GameSession) {
     if (!this.osmd || !this.anchors.length) return;
     const t = session.songTime;
-    const q = this.position(Math.max(t, 0), session.running);
+    // Glide while playing, and briefly after a free-play step to the next note.
+    const q = this.position(Math.max(t, 0), session.running || performance.now() < session.glideUntil);
     this.colorNotes(session, t, q);
   }
 

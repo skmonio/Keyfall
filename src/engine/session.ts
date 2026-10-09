@@ -1,7 +1,7 @@
 import { measureAt, type Hand, type Note, type Song } from '../model/song';
 import { SongClock } from './clock';
 import { gradeFor, Judge, Scorer, type Grade, type NoteState } from './judge';
-import { activeHands, type PlaySettings } from './settings';
+import { activeHands, clampSpeed, type PlaySettings } from './settings';
 
 /** What the session needs from the audio layer. Delays are real seconds from now. */
 export interface AudioSink {
@@ -95,6 +95,11 @@ export class GameSession {
   loopPasses = 0;
   /** True once the player has jumped around; such runs don't count as personal bests. */
   seeked = false;
+  /** Until this performance.now() time, views glide to a new position instead of jumping (free-play steps). */
+  glideUntil = 0;
+  /** Free play following: which chord we're on and which of its notes have been played. */
+  private freeIdx = -1;
+  private freeHit = new Set<number>();
   private seekTarget?: number;
   /** When looping: the results up to the end of the last completed pass (saved if you exit mid-loop). */
   completedPassResults?: SessionResults;
@@ -121,7 +126,7 @@ export class GameSession {
   ) {
     this.perfNow = deps.perfNow ?? (() => performance.now());
     this.clock = new SongClock(this.perfNow);
-    this.clock.setRate(settings.speed);
+    this.clock.setRate(clampSpeed(settings.mode, settings.speed));
     this.active = deps.demo ? new Set<Hand>() : activeHands(settings.hands);
 
     const ms = song.measures;
@@ -189,7 +194,7 @@ export class GameSession {
   }
 
   setSpeed(speed: number) {
-    const s = Math.max(0.25, Math.min(1.5, speed));
+    const s = clampSpeed(this.settings.mode, speed);
     this.settings.speed = s;
     this.clock.setRate(s);
     this.rescheduleFrom(this.clock.now());
@@ -281,9 +286,12 @@ export class GameSession {
 
   noteOn(pitch: number, perfTs = this.perfNow()) {
     this.held.add(pitch);
+    // Free play: nothing is judged; you just play along (and may move on by playing the shown notes).
+    if (this.settings.mode === 'free') {
+      if (this.followsPlaying) this.freeFollow(pitch);
+      return;
+    }
     if (!this.started || !this.clock.running || this.finished) return;
-    // Free play: nothing is judged; you just play along.
-    if (this.settings.mode === 'free') return;
     const t = this.songTimeOfPress(perfTs);
     if (this.settings.mode === 'wait') this.waitPress(pitch, perfTs, t);
     else this.performancePress(pitch, perfTs, t);
@@ -291,6 +299,40 @@ export class GameSession {
 
   noteOff(pitch: number) {
     this.held.delete(pitch);
+  }
+
+  /** Free play, not auto-scrolling, with the notes to play shown: playing them moves you on. */
+  get followsPlaying(): boolean {
+    return this.settings.mode === 'free' && !this.settings.freeAutoScroll && !!this.settings.freeShowNotes;
+  }
+
+  /** The chord at (or just after) the current position, while following your playing. */
+  private freeChordIndex(): number {
+    return this.chords.findIndex((c) => c.time >= this.songTime - 0.02);
+  }
+
+  private freeFollow(pitch: number) {
+    const i = this.freeChordIndex();
+    if (i < 0) return;
+    if (i !== this.freeIdx) {
+      this.freeIdx = i;
+      this.freeHit.clear();
+    }
+    const chord = this.chords[i];
+    const want = new Set(chord.notes.map((n) => n.pitch));
+    if (!want.has(pitch)) return;
+    this.freeHit.add(pitch);
+    this.deps.lights?.flash(pitch, 'hit');
+    // Every note of the chord played (or still held down): on to the next one.
+    if (![...want].every((p) => this.freeHit.has(p) || this.held.has(p))) return;
+    this.freeHit.clear();
+    this.glideUntil = this.perfNow() + 700;
+    const next = this.chords[i + 1];
+    if (next) this.seekTo(next.time);
+    else {
+      this.seekTo(this.rangeStart);
+      this.deps.onFreeEnd?.();
+    }
   }
 
   private performancePress(pitch: number, perf: number, t: number) {
@@ -519,6 +561,14 @@ export class GameSession {
    *    "next" is the chord after that (within 4 s).
    */
   targetNotes(): { now: Note[]; next: Note[] } {
+    if (this.followsPlaying) {
+      // Free play following your playing: the chord you're on, then the one after it.
+      const i = this.freeChordIndex();
+      if (i < 0) return { now: [], next: [] };
+      const now = this.chords[i].notes;
+      const next = this.settings.showNextNotes === false ? [] : (this.chords[i + 1]?.notes ?? []);
+      return { now, next };
+    }
     if (this.settings.mode === 'wait') {
       const now = (this.chords[this.waitIdx]?.notes ?? []).filter((n) => this.noteState(n.id).status === 'pending');
       const next = this.settings.showNextNotes === false ? [] : (this.chords[this.waitIdx + 1]?.notes ?? []);

@@ -71,7 +71,7 @@ export class SongClock {
 
   setRate(rate: number, perfMs = this.perfNow()) {
     this.reanchor(perfMs);
-    this._rate = Math.max(0.05, rate);
+    this._rate = Math.max(0.01, rate);
   }
 
   /** Hold at `songTime` (or release with Infinity). Releasing resumes from the hold point, not from where real time would be. */

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GameSession, type SessionResults } from '../../engine/session';
-import { sectionFor, type Calibration, type GameMode } from '../../engine/settings';
+import { sectionFor, speedRange, type Calibration, type GameMode } from '../../engine/settings';
 import { LightsDirector } from '../../midi/lightsDirector';
 import { toggleNoteHand } from '../../model/hands';
 import { estimateFingering } from '../../model/fingering';
@@ -9,6 +9,7 @@ import { HighwayRenderer } from '../../render/highway';
 import { db } from '../../storage/db';
 import type { Navigate } from '../App';
 import { SysexFix } from '../SysexFix';
+import { HEAR_MY_NOTES_HELP, HEAR_MY_NOTES_OFF_HELP, MODE_HELP, SOUND_HELP, SPEED_HELP, songHands, usableHands, handOptions } from '../help';
 import { KeyboardMismatch } from '../KeyboardMismatch';
 import { ensureAudio, getLumi, getSettings, input, onLumiChanged, piano, updateSettings, useSettings } from '../services';
 import { describeKey, SheetView, type SheetLayout } from '../../render/sheet';
@@ -56,6 +57,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
   const [sessionGen, setSessionGen] = useState(0);
   const [sheetInfo, setSheetInfo] = useState<string>();
   const live = useSettings();
+  const hasHands = useMemo(() => songHands(song), [song]);
   // Changing "Your keyboard" (e.g. from the LUMI warning) refits the song straight away.
   const firstKeyboard = useRef(true);
   useEffect(() => {
@@ -118,6 +120,8 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
       if (!resumeAfterRebuild.current) play.hands = lesson.hands;
       else play.hands = getSettings().play.hands;
     }
+    // A hand the song doesn't have (e.g. "Left" for a right-hand-only piece) falls back to the one it does.
+    play.hands = usableHands(play.hands, songHands(song));
     const lumi = getLumi();
     // Made even without a LUMI, so one that connects (or reconnects) mid-song lights up.
     const director = settings.lumiEnabled ? new LightsDirector(lumi, settings.colors, settings.nextColors) : undefined;
@@ -647,8 +651,12 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
         e.preventDefault();
         toggle();
       } else if (e.code === 'Escape') exit();
-      else if (e.code === 'Minus') setSpeed((sessionRef.current?.rate ?? 1) - 0.05);
-      else if (e.code === 'Equal') setSpeed((sessionRef.current?.rate ?? 1) + 0.05);
+      else if (e.code === 'Minus' || e.code === 'Equal') {
+        // Fine steps at very slow speeds (Free play can go down to 1%).
+        const r = sessionRef.current?.rate ?? 1;
+        const step = r < 0.1 || (r === 0.1 && e.code === 'Minus') ? 0.01 : 0.05;
+        setSpeed(+(r + (e.code === 'Equal' ? step : -step)).toFixed(2));
+      }
       else if (e.code === 'KeyR' && !e.metaKey && !e.ctrlKey) restart();
       else if (e.code === 'ArrowLeft') {
         e.preventDefault();
@@ -725,8 +733,8 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
         )}
         <div className="spacer" />
         <div className="seg" title="How to show the music">
-          <button className={!inSheet ? 'on' : ''} onClick={() => updateSettings((x) => (x.play.view = 'falling'))}>Falling notes</button>
-          {generatedXml && <button className={inSheet ? 'on' : ''} onClick={() => updateSettings((x) => (x.play.view = 'sheet'))}>Sheet music</button>}
+          <button className={!inSheet ? 'on' : ''} onClick={() => updateSettings((x) => (x.play.view = 'falling'))} title="Notes fall towards the keyboard, Guitar Hero style">Falling notes</button>
+          {generatedXml && <button className={inSheet ? 'on' : ''} onClick={() => updateSettings((x) => (x.play.view = 'sheet'))} title="Read from the sheet music, with a playhead showing where you are">Sheet music</button>}
         </div>
         {inSheet && (
           <>
@@ -740,23 +748,18 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             <label className="row small" style={{ gap: 4 }} title="Show which keys to press on the keyboard and the LUMI">
               <input type="checkbox" checked={sheetOpts.keyHints} onChange={(e) => setSheet((sh) => (sh.keyHints = e.target.checked))} /> Key hints
             </label>
-            <label className="row small" style={{ gap: 4 }}>
+            <label className="row small" style={{ gap: 4 }} title="Also show the falling notes under the sheet music">
               <input type="checkbox" checked={sheetOpts.showFalling} onChange={(e) => setSheet((sh) => (sh.showFalling = e.target.checked))} /> Falling notes
             </label>
           </>
         )}
-        <div className="seg" title="Practice: the notes wait for you. Perform: the music keeps going. Listen: hear how it sounds.">
-          <button className={!listening && live.play.mode === 'wait' ? 'on' : ''} onClick={() => switchMode('wait')} disabled={!!lesson}>Practice</button>
-          <button className={!listening && live.play.mode === 'performance' ? 'on' : ''} onClick={() => switchMode('performance')} disabled={!!lesson}>Perform</button>
-          <button
-            className={!listening && live.play.mode === 'free' ? 'on' : ''}
-            onClick={() => switchMode('free')}
-            disabled={!!lesson}
-            title="Free play: just the music and you. Nothing is judged or scored; it only moves if you turn on Auto-scroll."
-          >
+        <div className="seg">
+          <button className={!listening && live.play.mode === 'wait' ? 'on' : ''} onClick={() => switchMode('wait')} disabled={!!lesson} title={MODE_HELP.wait}>Practice</button>
+          <button className={!listening && live.play.mode === 'performance' ? 'on' : ''} onClick={() => switchMode('performance')} disabled={!!lesson} title={MODE_HELP.performance}>Perform</button>
+          <button className={!listening && live.play.mode === 'free' ? 'on' : ''} onClick={() => switchMode('free')} disabled={!!lesson} title={MODE_HELP.free}>
             Free
           </button>
-          <button className={listening ? 'on' : ''} onClick={() => toggleListen(!listening)}>🎧 Listen</button>
+          <button className={listening ? 'on' : ''} onClick={() => toggleListen(!listening)} title={MODE_HELP.listen}>🎧 Listen</button>
         </div>
         {freeMode && (
           <>
@@ -767,25 +770,45 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
                 onChange={(e) => {
                   const v = e.target.checked;
                   updateSettings((x) => (x.play.freeAutoScroll = v));
+                  if (sessionRef.current) sessionRef.current.settings.freeAutoScroll = v;
                   if (!v) sessionRef.current?.pause();
                   else startedRef.current = false; // shows Start, so it begins when you're ready
                 }}
               />{' '}
               Auto-scroll
             </label>
-            <label className="row small" style={{ gap: 4 }} title="Highlight the notes to play on the sheet, the keyboard and the LUMI">
-              <input type="checkbox" checked={live.play.freeShowNotes} onChange={(e) => updateSettings((x) => (x.play.freeShowNotes = e.target.checked))} /> Show notes to play
+            <label
+              className="row small"
+              style={{ gap: 4 }}
+              title="Highlight the notes to play on the sheet, the keyboard and the LUMI. Without auto-scroll, playing them moves you on to the next notes."
+            >
+              <input
+                type="checkbox"
+                checked={live.play.freeShowNotes}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  updateSettings((x) => (x.play.freeShowNotes = v));
+                  if (sessionRef.current) sessionRef.current.settings.freeShowNotes = v; // takes effect immediately
+                }}
+              />{' '}
+              Show notes to play
             </label>
           </>
         )}
-        <div className="seg" title="Which hand(s) you play. Switch any time: you stay at the same place in the music.">
-          {(['left', 'both', 'right'] as const).map((h) => (
-            <button key={h} className={live.play.hands === h ? 'on' : ''} onClick={() => switchHands(h)}>
-              {h === 'left' ? 'Left' : h === 'both' ? 'Both' : 'Right'}
+        <div className="seg">
+          {handOptions(hasHands).map(([h, label, { title, disabled }]) => (
+            <button
+              key={h}
+              className={usableHands(live.play.hands, hasHands) === h ? 'on' : ''}
+              onClick={() => switchHands(h)}
+              disabled={disabled}
+              title={`${title}${disabled ? '' : '. Switch any time: you stay at the same place in the music.'}`}
+            >
+              {label}
             </button>
           ))}
         </div>
-        <div className="seg" title="Full: the whole song · My hand: just your part as a guide · Metro: clicks · Silent: only the keys you press">
+        <div className="seg">
           {(
             [
               ['full', 'Full'],
@@ -797,6 +820,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             <button
               key={v}
               className={live.play.audio === v ? 'on' : ''}
+              title={SOUND_HELP[v]}
               onClick={() => {
                 updateSettings((x) => (x.play.audio = v));
                 sessionRef.current?.setAudioMode(v);
@@ -807,9 +831,14 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
           ))}
         </div>
         <InstrumentSelect />
-        <label className="row small" style={{ gap: 4 }} title="Play your own part quietly as each note comes up, so you hear what to play next. Off: you only hear the keys you press (plus the other hand and backing in Full).">
+        <label
+          className={`row small${live.play.audio === 'metronome' || live.play.audio === 'silent' ? ' muted' : ''}`}
+          style={{ gap: 4 }}
+          title={live.play.audio === 'metronome' || live.play.audio === 'silent' ? HEAR_MY_NOTES_OFF_HELP : HEAR_MY_NOTES_HELP}
+        >
           <input
             type="checkbox"
+            disabled={live.play.audio === 'metronome' || live.play.audio === 'silent'}
             checked={live.play.hearMyNotes !== false}
             onChange={(e) => {
               const v = e.target.checked;
@@ -837,9 +866,16 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
         <label className="row small" style={{ gap: 4 }} title="Finger numbers on the falling notes and the sheet music">
           <input type="checkbox" checked={live.play.showFingers} onChange={(e) => updateSettings((x) => (x.play.showFingers = e.target.checked))} /> Finger numbers
         </label>
-        <div className="row small">
+        <div className="row small" title={SPEED_HELP}>
           Speed
-          <input type="range" min={25} max={150} step={5} value={Math.round(hud.speed * 100)} onChange={(e) => setSpeed(Number(e.target.value) / 100)} />
+          <input
+            type="range"
+            min={Math.round(speedRange(live.play.mode)[0] * 100)}
+            max={Math.round(speedRange(live.play.mode)[1] * 100)}
+            step={live.play.mode === 'free' ? 1 : 5}
+            value={Math.round(hud.speed * 100)}
+            onChange={(e) => setSpeed(Number(e.target.value) / 100)}
+          />
           <b style={{ width: 40 }}>{Math.round(hud.speed * 100)}%</b>
         </div>
         <button onClick={() => sessionRef.current?.seekBars(-1)} title="Back a bar (←)">⏮</button>
@@ -863,7 +899,11 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             (a changing toolbar resizes the canvas, which made the notes stutter). */}
         <div className="play-status">
           {hud.waiting && <span className="pill warn">Waiting for you…</span>}
-          {byHand && <span className="pill">Free play · drag the music, scroll, or ←/→ to move through it</span>}
+          {byHand && (
+            <span className="pill">
+              {live.play.freeShowNotes ? 'Free play · play the highlighted notes to move on, or drag / scroll / ←→' : 'Free play · drag the music, scroll, or ←/→ to move through it'}
+            </span>
+          )}
           {quietPause && hud.started && !hud.running && !byHand && (
             <button className="primary" onClick={() => start()} title="Play from here (Space)">
               ▶ Play from here

@@ -229,6 +229,48 @@ describe('GameSession – loops, speed and audio', () => {
     expect(s.songTime).toBeLessThan(0.5);
   });
 
+  it('free play with notes shown moves on when you play them (chords need every note)', () => {
+    const ft = new FakeTime();
+    let ended = 0;
+    const s = new GameSession(
+      makeSong([
+        { pitch: 60, start: 0.5 },
+        { pitch: 64, start: 1 },
+        { pitch: 67, start: 1 },
+      ]),
+      settings({ mode: 'free', freeAutoScroll: false, freeShowNotes: true }),
+      { perfNow: ft.now, onFreeEnd: () => ended++ },
+    );
+    s.seekTo(s.rangeStart);
+    expect([...s.keyTargets().keys()]).toEqual([60]);
+    s.noteOn(62); // not shown: nothing happens
+    expect(s.songTime).toBeLessThan(0.5);
+    s.noteOn(60);
+    expect(s.songTime).toBeCloseTo(1);
+    expect([...s.keyTargets().keys()].sort()).toEqual([64, 67]);
+    s.noteOn(64);
+    expect(s.songTime).toBeCloseTo(1); // half the chord
+    s.noteOn(67);
+    // Last chord played: back to the start, ready to go again.
+    expect(ended).toBe(1);
+    expect(s.songTime).toBeLessThan(0.5);
+    // Without "Show notes to play", playing doesn't move anything.
+    s.settings.freeShowNotes = false;
+    s.noteOn(60);
+    expect(s.songTime).toBeLessThan(0.5);
+  });
+
+  it('lets free play go down to 1% speed, other modes stay at 25–150%', () => {
+    const free = new GameSession(makeSong([{ pitch: 60, start: 1 }]), settings({ mode: 'free', speed: 0.05 }), {});
+    expect(free.rate).toBeCloseTo(0.05);
+    free.setSpeed(0);
+    expect(free.rate).toBeCloseTo(0.01);
+    free.setSpeed(1.4);
+    expect(free.rate).toBeCloseTo(1);
+    const perf = new GameSession(makeSong([{ pitch: 60, start: 1 }]), settings({ mode: 'performance', speed: 0.05 }), {});
+    expect(perf.rate).toBeCloseTo(0.25);
+  });
+
   it('changes speed without jumping the song position', () => {
     const ft = new FakeTime();
     const s = new GameSession(makeSong([{ pitch: 60, start: 4 }]), settings({ mode: 'performance' }), { perfNow: ft.now });

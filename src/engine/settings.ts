@@ -5,6 +5,15 @@ import type { KeyboardKind } from '../model/fit';
 /** wait: the music waits for each chord · performance: it keeps going and you're scored ·
  *  free: it keeps going and nothing is judged, you just play along. */
 export type GameMode = 'wait' | 'performance' | 'free';
+
+/** Speed range per mode: Free play's auto-scroll can go as slow as 1%. */
+export function speedRange(mode: GameMode): [number, number] {
+  return mode === 'free' ? [0.01, 1] : [0.25, 1.5];
+}
+export function clampSpeed(mode: GameMode, speed: number): number {
+  const [lo, hi] = speedRange(mode);
+  return Math.max(lo, Math.min(hi, speed));
+}
 export type HandsMode = 'both' | 'left' | 'right';
 /**
  * full      – the whole song: the other hand at full volume, your own part quietly as a guide

@@ -2,6 +2,7 @@ import { estimateFingering } from '../model/fingering';
 import { applyFit, planFit, resolveKeyboard, type FitPlan, type KeyboardSpec } from '../model/fit';
 import type { Song } from '../model/song';
 import { activeHands, type AppSettings } from '../engine/settings';
+import { songHands, usableHands } from './help';
 
 export interface FitResult {
   spec: KeyboardSpec;
@@ -19,7 +20,8 @@ export function lumiCanMove(settings: AppSettings, sysex: boolean): boolean {
 
 export function computeFit(song: Song, settings: AppSettings, lumiConnected: boolean, canMoveLumi = false): FitResult {
   const spec = resolveKeyboard(settings.keyboard, lumiConnected);
-  const hands = activeHands(settings.play.hands);
+  // A hand the song doesn't have falls back to the one it does (as in the play screen).
+  const hands = activeHands(usableHands(settings.play.hands, songHands(song)));
   const songPos = settings.play.keyboardPos?.songId === song.id ? settings.play.keyboardPos.lo : undefined;
   // If the app can't move the LUMI, fit the song to wherever the LUMI is.
   const pos = songPos ?? (spec.lumi && !canMoveLumi && settings.lumiBase !== undefined ? settings.lumiBase : undefined);

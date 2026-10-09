@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SessionResults } from '../../engine/session';
-import { sectionFor, type AudioMode, type GameMode, type HandsMode } from '../../engine/settings';
+import { clampSpeed, sectionFor, speedRange, type AudioMode, type GameMode, type HandsMode } from '../../engine/settings';
 import { estimateFingering } from '../../model/fingering';
 import { resetHandsByStaff, setHandForMeasures, splitHandsAt } from '../../model/hands';
 import { pitchName, type Song } from '../../model/song';
@@ -12,6 +12,7 @@ import { KeyboardStrip } from '../KeyboardStrip';
 import { SongProgress } from '../SongProgress';
 import { LessonCard } from '../LessonCard';
 import { Seg } from '../Seg';
+import { HEAR_MY_NOTES_HELP, HEAR_MY_NOTES_OFF_HELP, MODE_HELP, SOUND_HELP, SPEED_HELP, handOptions, songHands, usableHands } from '../help';
 import { InstrumentSelect } from '../InstrumentSelect';
 import { computeFit, lumiCanMove } from '../fit';
 import { KEYBOARDS, type KeyboardKind } from '../../model/fit';
@@ -86,7 +87,8 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
   const backingParts = (song.parts ?? []).filter((p) => p.role === 'backing').map((p) => p.name);
   const melodyOnly = (song.parts?.length ?? 0) === 1 && song.parts![0].role === 'melody';
   const scoreFingers = song.notes.filter((n) => n.fingerSource === 'score').length;
-  const best = personalBest(results, p.mode, p.hands);
+  const hands = usableHands(p.hands, songHands(song));
+  const best = personalBest(results, p.mode, hands);
   const ORD = ['', '', '2nd', '3rd', '4th', '5th'];
   const barLabel = (i: number) => {
     const m = song.measures[i];
@@ -152,9 +154,9 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             <Seg<GameMode>
               value={p.mode}
               options={[
-                ['wait', 'Wait (practice)'],
-                ['performance', 'Performance'],
-                ['free', 'Free play'],
+                ['wait', 'Wait (practice)', { title: MODE_HELP.wait }],
+                ['performance', 'Performance', { title: MODE_HELP.performance }],
+                ['free', 'Free play', { title: MODE_HELP.free }],
               ]}
               onChange={(v) => setPlay((pl) => (pl.mode = v))}
             />
@@ -163,7 +165,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
                 <label className="row" style={{ gap: 6 }} title="Off: the music stays put and you move through it yourself">
                   <input type="checkbox" checked={p.freeAutoScroll} onChange={(e) => setPlay((pl) => (pl.freeAutoScroll = e.target.checked))} /> Auto-scroll
                 </label>
-                <label className="row" style={{ gap: 6 }}>
+                <label className="row" style={{ gap: 6 }} title="Highlight the notes to play on the sheet, the keyboard and the LUMI. Without auto-scroll, playing them moves you on to the next notes.">
                   <input type="checkbox" checked={p.freeShowNotes} onChange={(e) => setPlay((pl) => (pl.freeShowNotes = e.target.checked))} /> Show notes to play
                 </label>
               </div>
@@ -174,9 +176,9 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             <Seg<'falling' | 'sheet'>
               value={canSheet ? p.view : 'falling'}
               options={canSheet ? [
-                ['falling', 'Falling notes'],
-                ['sheet', 'Sheet music'],
-              ] : [['falling', 'Falling notes']]}
+                ['falling', 'Falling notes', { title: 'Notes fall towards the keyboard, Guitar Hero style' }],
+                ['sheet', 'Sheet music', { title: 'Read from the sheet music, with a playhead showing where you are' }],
+              ] : [['falling', 'Falling notes', { title: 'Notes fall towards the keyboard, Guitar Hero style' }]]}
               onChange={(v) => setPlay((pl) => (pl.view = v))}
             />
             {canSheet && !song.musicXml && song.sourceKind !== 'exercise' && p.view === 'sheet' && <span className="small muted">Score generated from the {song.sourceKind === 'audio' ? 'recording' : 'MIDI'}</span>}
@@ -191,12 +193,8 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
           <div className="field">
             <label>Hands</label>
             <Seg<HandsMode>
-              value={p.hands}
-              options={[
-                ['left', 'Left'],
-                ['both', 'Both'],
-                ['right', 'Right'],
-              ]}
+              value={usableHands(p.hands, songHands(song))}
+              options={handOptions(songHands(song))}
               onChange={(v) => setPlay((pl) => (pl.hands = v))}
             />
 
@@ -206,18 +204,25 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             <Seg<AudioMode>
               value={p.audio}
               options={[
-                ['full', 'Full'],
-                ['mine', 'My hand'],
-                ['metronome', 'Metro'],
-                ['silent', 'Silent'],
+                ['full', 'Full', { title: SOUND_HELP.full }],
+                ['mine', 'My hand', { title: SOUND_HELP.mine }],
+                ['metronome', 'Metro', { title: SOUND_HELP.metronome }],
+                ['silent', 'Silent', { title: SOUND_HELP.silent }],
               ]}
               onChange={(v) => setPlay((pl) => (pl.audio = v))}
             />
             <InstrumentSelect />
           </div>
-          <div className="field" style={{ minWidth: 220 }}>
-            <label>Speed: {Math.round(p.speed * 100)}%</label>
-            <input type="range" min={25} max={150} step={5} value={Math.round(p.speed * 100)} onChange={(e) => setPlay((pl) => (pl.speed = Number(e.target.value) / 100))} />
+          <div className="field" style={{ minWidth: 220 }} title={SPEED_HELP}>
+            <label>Speed: {Math.round(clampSpeed(p.mode, p.speed) * 100)}%</label>
+            <input
+              type="range"
+              min={Math.round(speedRange(p.mode)[0] * 100)}
+              max={Math.round(speedRange(p.mode)[1] * 100)}
+              step={p.mode === 'free' ? 1 : 5}
+              value={Math.round(clampSpeed(p.mode, p.speed) * 100)}
+              onChange={(e) => setPlay((pl) => (pl.speed = Number(e.target.value) / 100))}
+            />
           </div>
         </div>
 
@@ -247,19 +252,23 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             <input type="checkbox" disabled={!p.loop} checked={p.speedUpOnClean} onChange={(e) => setPlay((pl) => (pl.speedUpOnClean = e.target.checked))} />
             +5% speed after each clean run
           </label>
-          <label className="row small" style={{ gap: 6 }} title="Play your own part quietly as each note comes up, so you hear what to play next">
-            <input type="checkbox" checked={p.hearMyNotes !== false} onChange={(e) => setPlay((pl) => (pl.hearMyNotes = e.target.checked))} />
+          <label
+            className="row small"
+            style={{ gap: 6, opacity: p.audio === 'metronome' || p.audio === 'silent' ? 0.5 : 1 }}
+            title={p.audio === 'metronome' || p.audio === 'silent' ? HEAR_MY_NOTES_OFF_HELP : HEAR_MY_NOTES_HELP}
+          >
+            <input type="checkbox" disabled={p.audio === 'metronome' || p.audio === 'silent'} checked={p.hearMyNotes !== false} onChange={(e) => setPlay((pl) => (pl.hearMyNotes = e.target.checked))} />
             Hear my notes (guide)
           </label>
           <label className="row small" style={{ gap: 6 }} title="Show the note after the one to play now: faded on the keyboard, in its own colour on the LUMI">
             <input type="checkbox" checked={p.showNextNotes} onChange={(e) => setPlay((pl) => (pl.showNextNotes = e.target.checked))} />
             Show next notes
           </label>
-          <label className="row small" style={{ gap: 6 }}>
+          <label className="row small" style={{ gap: 6 }} title="Note names (C, D, E♭ …) on the keys, the falling notes and the sheet music">
             <input type="checkbox" checked={p.showNoteNames} onChange={(e) => setPlay((pl) => (pl.showNoteNames = e.target.checked))} />
             Show note names
           </label>
-          <label className="row small" style={{ gap: 6 }}>
+          <label className="row small" style={{ gap: 6 }} title="Finger numbers on the falling notes and the sheet music">
             <input type="checkbox" checked={p.showFingers} onChange={(e) => setPlay((pl) => (pl.showFingers = e.target.checked))} />
             Show finger numbers
           </label>
@@ -276,7 +285,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
         </div>
         {best && (
           <div className="small muted">
-            Personal best ({p.mode}, {p.hands} hands): <b style={{ color: 'var(--text)' }}>{best.score.toLocaleString()}</b> ·{' '}
+            Personal best ({p.mode}, {hands} hands): <b style={{ color: 'var(--text)' }}>{best.score.toLocaleString()}</b> ·{' '}
             {Math.round(best.accuracy * 100)}% · {'★'.repeat(best.stars)} at {Math.round(best.speed * 100)}% speed
           </div>
         )}
@@ -304,7 +313,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             </>
           )}
         </div>
-        <KeyboardStrip notes={song.notes} lo={plan.lo} hi={plan.hi} colors={settings.colors} hands={activeHands(p.hands)} />
+        <KeyboardStrip notes={song.notes} lo={plan.lo} hi={plan.hi} colors={settings.colors} hands={activeHands(hands)} />
         {spec.keys >= 88 ? (
           <div className="small muted">The whole piano is available, so the song plays as written.</div>
         ) : (
@@ -321,7 +330,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
                     : `: ${plan.lumiOctave === 0 ? 'the default octave' : `press the LUMI's octave ${plan.lumiOctave > 0 ? '▲' : '▼'} button ${Math.abs(plan.lumiOctave)}× from the default`})`}
                 </>
               )}
-              . The song needs {pitchName(plan.songLo)}–{pitchName(plan.songHi)} ({plan.songHi - plan.songLo + 1} keys) for {p.hands === 'both' ? 'both hands' : `the ${p.hands} hand`}.
+              . The song needs {pitchName(plan.songLo)}–{pitchName(plan.songHi)} ({plan.songHi - plan.songLo + 1} keys) for {hands === 'both' ? 'both hands' : `the ${hands} hand`}.
             </div>
             {plan.fitsAsWritten ? (
               <div style={{ color: 'var(--good)' }}>✓ Fits your keyboard as written.</div>
@@ -343,7 +352,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
                       .join(' · ')
                       .replace(/^./, (c) => c.toUpperCase())}
                     . The backing track still plays the notes as written.
-                    {p.hands === 'both' && (plan.handFits.L || plan.handFits.R) && (
+                    {hands === 'both' && (plan.handFits.L || plan.handFits.R) && (
                       <>
                         {' '}Tip: this song is wider than your keyboard, so try one hand at a time:{' '}
                         {plan.handFits.R && <button className="link" onClick={() => setPlay((pl) => (pl.hands = 'right'))}>right hand</button>}
