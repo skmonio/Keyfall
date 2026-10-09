@@ -196,6 +196,39 @@ describe('GameSession – loops, speed and audio', () => {
     expect(played('mine', false, false)).toEqual([]);
   });
 
+  it('free play: nothing is judged, and it stops back at the start at the end', () => {
+    const ft = new FakeTime();
+    let ended = 0;
+    let finished = 0;
+    const s = new GameSession(
+      makeSong([
+        { pitch: 60, start: 0.5 },
+        { pitch: 62, start: 1 },
+      ]),
+      settings({ mode: 'free', countIn: false }),
+      { perfNow: ft.now, onFreeEnd: () => ended++, onFinish: () => finished++ },
+    );
+    s.start();
+    ft.advance(500);
+    s.tick();
+    s.noteOn(61); // a "wrong" note
+    s.noteOn(60);
+    ft.advance(3000);
+    s.tick();
+    expect(ended).toBe(0);
+    ft.advance(8000); // past the end of the 8-second song (after a 2-second lead-in)
+    s.tick();
+    // Nothing judged: no hits, misses or wrong notes, and the notes stay pending.
+    expect(s.scorer.judged('R')).toBe(0);
+    expect(s.scorer.byHand.R.wrong).toBe(0);
+    expect(s.noteState(0).status).toBe('pending');
+    // At the end it pauses back at the start instead of showing results.
+    expect(ended).toBe(1);
+    expect(finished).toBe(0);
+    expect(s.running).toBe(false);
+    expect(s.songTime).toBeLessThan(0.5);
+  });
+
   it('changes speed without jumping the song position', () => {
     const ft = new FakeTime();
     const s = new GameSession(makeSong([{ pitch: 60, start: 4 }]), settings({ mode: 'performance' }), { perfNow: ft.now });

@@ -77,6 +77,8 @@ export interface SessionDeps {
   skipGaps?: boolean;
   onFinish?: (r: SessionResults) => void;
   onLoop?: (pass: number, clean: boolean, newSpeed: number) => void;
+  /** Free play reached the end (it stops at the start, ready to go again). */
+  onFreeEnd?: () => void;
 }
 
 export class GameSession {
@@ -280,6 +282,8 @@ export class GameSession {
   noteOn(pitch: number, perfTs = this.perfNow()) {
     this.held.add(pitch);
     if (!this.started || !this.clock.running || this.finished) return;
+    // Free play: nothing is judged; you just play along.
+    if (this.settings.mode === 'free') return;
     const t = this.songTimeOfPress(perfTs);
     if (this.settings.mode === 'wait') this.waitPress(pitch, perfTs, t);
     else this.performancePress(pitch, perfTs, t);
@@ -384,11 +388,18 @@ export class GameSession {
     if (this.settings.loop) {
       this.loopPasses++;
       const clean = this.passErrors === 0;
-      this.completedPassResults = this.results();
-      if (clean && this.settings.speedUpOnClean) this.setSpeed(Math.min(1.5, this.clock.rate + 0.05));
+      if (this.settings.mode !== 'free') this.completedPassResults = this.results();
+      if (clean && this.settings.speedUpOnClean && this.settings.mode !== 'free') this.setSpeed(Math.min(1.5, this.clock.rate + 0.05));
       this.passErrors = 0;
       this.deps.onLoop?.(this.loopPasses, clean, this.clock.rate);
       this.seekTo(this.rangeStart - this.leadIn);
+      return;
+    }
+    if (this.settings.mode === 'free') {
+      // No score to show: stop back at the start, ready to play it again.
+      this.pause();
+      this.seekTo(this.rangeStart - this.leadIn);
+      this.deps.onFreeEnd?.();
       return;
     }
     if (t >= this.rangeEnd + Math.max(goodSong, 0.5)) {

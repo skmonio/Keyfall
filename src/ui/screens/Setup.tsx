@@ -154,6 +154,7 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
               options={[
                 ['wait', 'Wait (practice)'],
                 ['performance', 'Performance'],
+                ['free', 'Free play'],
               ]}
               onChange={(v) => setPlay((pl) => (pl.mode = v))}
             />

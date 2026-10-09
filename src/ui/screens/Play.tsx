@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GameSession, type SessionResults } from '../../engine/session';
-import { sectionFor, type Calibration } from '../../engine/settings';
+import { sectionFor, type Calibration, type GameMode } from '../../engine/settings';
 import { LightsDirector } from '../../midi/lightsDirector';
 import { toggleNoteHand } from '../../model/hands';
 import { estimateFingering } from '../../model/fingering';
@@ -152,7 +152,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
 
     // Songs imported from audio can use the original recording as the backing track.
     // Wait mode stops and starts the music at every chord, so it keeps the synthesised piano.
-    const rec = recording && play.useRecording && play.mode === 'performance' && play.audio === 'full' ? new RecordingPlayer(recording) : undefined;
+    const rec = recording && play.useRecording && play.mode !== 'wait' && play.audio === 'full' ? new RecordingPlayer(recording) : undefined;
 
     const prev = sessionRef.current;
     if (listening) play.audio = 'full';
@@ -180,7 +180,16 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             setListening(false);
           }
         : finish,
+      onFreeEnd: () => {
+        setToast('The end! Press ▶ to play it again.');
+        setTimeout(() => setToast(undefined), 2500);
+      },
       onLoop: (pass, clean, speed) => {
+        if (play.mode === 'free') {
+          setToast('Again from the top');
+          setTimeout(() => setToast(undefined), 1500);
+          return;
+        }
         setToast(clean ? `Clean run ${pass}!${play.speedUpOnClean ? ` Speed → ${Math.round(speed * 100)}%` : ''}` : `Run ${pass} done. Go again!`);
         if (play.speedUpOnClean) updateSettings((s) => (s.play.speed = speed));
         setTimeout(() => setToast(undefined), 1800);
@@ -423,7 +432,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
 
   // Change hands mid-song: rebuild the session at the same place (the score starts again).
   // Switch practice/perform mid-song: rebuild at the same place, and keep playing if we were.
-  const switchMode = (m: 'wait' | 'performance') => {
+  const switchMode = (m: GameMode) => {
     if (listening) {
       updateSettings((x) => (x.play.mode = m));
       toggleListen(false);
@@ -652,20 +661,29 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
       )}
       <div className="hud">
         <button onClick={exit}>✕</button>
-        <div className="stat">
-          <small>Score</small>
-          <b>{hud.score.toLocaleString()}</b>
-        </div>
-        <div className="stat">
-          <small>Combo</small>
-          <b>
-            {hud.combo} {hud.mult > 1 && <span className="mult">×{hud.mult}</span>}
-          </b>
-        </div>
-        <div className="stat">
-          <small>Accuracy</small>
-          <b>{Math.round(hud.acc * 100)}%</b>
-        </div>
+        {s.mode === 'free' ? (
+          <div className="stat">
+            <small>Mode</small>
+            <b>Free play</b>
+          </div>
+        ) : (
+          <>
+            <div className="stat">
+              <small>Score</small>
+              <b>{hud.score.toLocaleString()}</b>
+            </div>
+            <div className="stat">
+              <small>Combo</small>
+              <b>
+                {hud.combo} {hud.mult > 1 && <span className="mult">×{hud.mult}</span>}
+              </b>
+            </div>
+            <div className="stat">
+              <small>Accuracy</small>
+              <b>{Math.round(hud.acc * 100)}%</b>
+            </div>
+          </>
+        )}
         <div className="stat">
           <small>Bar</small>
           <b>{hud.bar}</b>
@@ -701,6 +719,14 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
         <div className="seg" title="Practice: the notes wait for you. Perform: the music keeps going. Listen: hear how it sounds.">
           <button className={!listening && live.play.mode === 'wait' ? 'on' : ''} onClick={() => switchMode('wait')} disabled={!!lesson}>Practice</button>
           <button className={!listening && live.play.mode === 'performance' ? 'on' : ''} onClick={() => switchMode('performance')} disabled={!!lesson}>Perform</button>
+          <button
+            className={!listening && live.play.mode === 'free' ? 'on' : ''}
+            onClick={() => switchMode('free')}
+            disabled={!!lesson}
+            title="Free play: the music moves along and you play with it. Nothing is judged or scored."
+          >
+            Free
+          </button>
           <button className={listening ? 'on' : ''} onClick={() => toggleListen(!listening)}>🎧 Listen</button>
         </div>
         <div className="seg" title="Which hand(s) you play. Switch any time: you stay at the same place in the music.">
@@ -851,7 +877,12 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
                 <>
                   <h2>{song.title}</h2>
                   <div className="muted small">
-                    {s.mode === 'wait' ? 'The notes wait for you at each chord.' : 'The music keeps going: stay in time!'} Space = play/pause,{' '}
+                    {s.mode === 'wait'
+                      ? 'The notes wait for you at each chord.'
+                      : s.mode === 'free'
+                        ? 'Free play: the music moves along and you play with it. Nothing is scored.'
+                        : 'The music keeps going: stay in time!'}{' '}
+                    Space = play/pause,{' '}
                     <span className="kbd">-</span>/<span className="kbd">=</span> speed, <span className="kbd">←</span>/<span className="kbd">→</span> bar back/forward, R = restart, Esc = exit.
                   </div>
                   <div className="row" style={{ justifyContent: 'center' }}>

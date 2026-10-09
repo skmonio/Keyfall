@@ -8,7 +8,7 @@ On a LUMI, the keys you need to press next light up.
 - **One colour scheme everywhere:** each hand has a **play now** colour and a **next note** colour (right: blue / cyan, left: orange / yellow). The on-screen keyboard, the sheet-music highlights and the LUMI's keys all show the same notes in the same colours. The colours are taken from the LUMI's palette, so they match exactly; you can change them in Settings, and any colour you pick snaps to one the LUMI can show. "Now" is the chord being waited for (Wait mode) or each hand's next chord (Performance), shown solid with an outline; "next" is the chord after it, shown faded. Next-note hints are off by default; tick **Next notes** (play toolbar) or **Show next notes** (setup) to show them, on screen and on the LUMI.
 - **Rename songs** from the library (Rename) or the song's setup screen (✎ Rename). A held key shows your hand's colour when it's right and red when it's wrong. When you practise one hand, the other hand is hidden and the keyboard zooms to your hand's range. Switch **Left / Both / Right** in the play toolbar at any time: the song carries on from the same place (the score for the run starts again).
 - **Hands and fingering:** treble staff = right hand, bass staff = left hand. You can override this per section, by split point, or per note (pause, then click the note). Fingering comes from the score if it has any, and is estimated otherwise.
-- **Modes:** Wait (the music stops at each chord until you play it), Performance (the music keeps going), left / right / both hands with optional auto-play of the other hand, A–B loops with an optional +5% speed-up after each clean run, 25–150% speed without pitch change, and four audio modes.
+- **Modes:** Wait (the music stops at each chord until you play it), Performance (the music keeps going), Free play (the music moves along and you play with it, nothing judged or scored, just like reading sheet music; it stops back at the start when it ends), left / right / both hands with optional auto-play of the other hand, A–B loops with an optional +5% speed-up after each clean run, 25–150% speed without pitch change, and four audio modes.
 - **Scoring:** Perfect / Great / Good / Miss (±40 / 80 / 120 ms, adjustable), combo, ×2/×3/×4 multiplier, accuracy, 1–5 stars, per-hand stats, the bars with the most errors, and personal bests.
 - **LUMI lights:** upcoming notes glow in the hand colour, a correct hit flashes white and a wrong key flashes red. There's a LUMI test screen to check the lights.
 - **Latency calibration:** tap-along tests, stored per device.
@@ -270,7 +270,7 @@ In every mode the keys you press sound too, unless you switch off **Play my keys
 npm test
 ```
 
-172 tests cover:
+173 tests cover:
 - the MusicXML importer (pitches, chords, ties, backup/staves, fingering, tempo changes, multi-part scores, pickups, grace notes, `.mxl` unzip, errors)
 - the MIDI importer (hand assignment by pitch and track name, type-0 channel split, drums, measures, errors)
 - the timing judge (windows, speed scaling, matching, misses, loop reset) and scoring (multiplier, accuracy, stars)

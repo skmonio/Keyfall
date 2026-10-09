@@ -2,7 +2,7 @@ import type { SessionResults } from '../engine/session';
 import { barHeat, formatMinutes } from '../model/progress';
 import { BarHeatStrip, LineChart } from './charts';
 
-const MODE = { wait: 'Wait', performance: 'Performance' } as const;
+const MODE = { wait: 'Wait', performance: 'Performance', free: 'Free play' } as const;
 const HANDS = { both: 'both hands', left: 'left hand', right: 'right hand' } as const;
 
 /** Progress for one song: accuracy over time, and which bars need work. */

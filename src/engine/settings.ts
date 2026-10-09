@@ -2,7 +2,9 @@ import { DEFAULT_WINDOWS, type TimingWindows } from './judge';
 import type { Hand } from '../model/song';
 import type { KeyboardKind } from '../model/fit';
 
-export type GameMode = 'wait' | 'performance';
+/** wait: the music waits for each chord · performance: it keeps going and you're scored ·
+ *  free: it keeps going and nothing is judged, you just play along. */
+export type GameMode = 'wait' | 'performance' | 'free';
 export type HandsMode = 'both' | 'left' | 'right';
 /**
  * full      – the whole song: the other hand at full volume, your own part quietly as a guide

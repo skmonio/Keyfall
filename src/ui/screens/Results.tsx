@@ -97,7 +97,7 @@ export function Results({ song, results: r, lesson, nav }: { song: Song; results
         </div>
       )}
       <div className="card col" style={{ alignItems: 'center', textAlign: 'center' }}>
-        <div className="muted">{song.title} · {r.section} · {r.mode === 'wait' ? 'Wait mode' : 'Performance'} · {Math.round(r.speed * 100)}% speed</div>
+        <div className="muted">{song.title} · {r.section} · {r.mode === 'wait' ? 'Wait mode' : r.mode === 'free' ? 'Free play' : 'Performance'} · {Math.round(r.speed * 100)}% speed</div>
         <Stars n={r.stars} />
         <div className="big">{r.score.toLocaleString()}</div>
         {r.seeked ? (
