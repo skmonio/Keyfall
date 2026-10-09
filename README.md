@@ -247,6 +247,8 @@ Pick on the setup screen, or switch any time in the play toolbar:
 | Metro | Metronome clicks. |
 | Silent | Nothing from the song: you play. |
 
+**Hear my notes** (toolbar and setup screen, on by default) switches the guide off: your own part is then never played for you, so in Full you hear only the other hand and backing, and "My hand" becomes silent apart from your own key presses.
+
 In every mode the keys you press sound too, unless you switch off **Play my keys through the app** in Settings (for keyboards with their own speakers; a LUMI has none). A one-bar count-in click plays in every mode except Silent (you can turn it off). The metronome follows the tempo, so its clicks stay evenly spaced through pickups and bars that are short in the file. (In Wait mode it pauses while the music waits for you.)
 
 ## Known limitations

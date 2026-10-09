@@ -732,6 +732,18 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
           ))}
         </div>
         <InstrumentSelect />
+        <label className="row small" style={{ gap: 4 }} title="Play your own part quietly as each note comes up, so you hear what to play next. Off: you only hear the keys you press (plus the other hand and backing in Full).">
+          <input
+            type="checkbox"
+            checked={live.play.hearMyNotes !== false}
+            onChange={(e) => {
+              const v = e.target.checked;
+              updateSettings((x) => (x.play.hearMyNotes = v));
+              sessionRef.current?.setHearMyNotes(v); // takes effect immediately
+            }}
+          />{' '}
+          Hear my notes
+        </label>
         <label className="row small" style={{ gap: 4 }} title="Also show the note after the one to play now (faded on screen, and on the LUMI)">
           <input
             type="checkbox"

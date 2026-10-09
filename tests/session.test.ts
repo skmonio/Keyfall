@@ -170,7 +170,7 @@ describe('GameSession – loops, speed and audio', () => {
   });
 
   it('routes score audio by sound mode and auto-play', () => {
-    const played = (audio: PlaySettings['audio'], autoPlayOtherHand: boolean) => {
+    const played = (audio: PlaySettings['audio'], autoPlayOtherHand: boolean, hearMyNotes = true) => {
       const ft = new FakeTime();
       const out: number[] = [];
       const sink: AudioSink = { scheduleNote: (p) => out.push(p), scheduleClick: () => {}, cancelScheduled: () => {} };
@@ -178,7 +178,7 @@ describe('GameSession – loops, speed and audio', () => {
         { pitch: 48, start: 0, hand: 'L' },
         { pitch: 72, start: 0, hand: 'R' },
       ]);
-      const s = new GameSession(song, settings({ mode: 'performance', hands: 'right', audio, autoPlayOtherHand }), { perfNow: ft.now, audio: sink });
+      const s = new GameSession(song, settings({ mode: 'performance', hands: 'right', audio, autoPlayOtherHand, hearMyNotes }), { perfNow: ft.now, audio: sink });
       s.start();
       ft.advance(2000);
       s.tick();
@@ -191,6 +191,9 @@ describe('GameSession – loops, speed and audio', () => {
     // Metro and Silent: nothing from the song.
     expect(played('metronome', false)).toEqual([]);
     expect(played('silent', false)).toEqual([]);
+    // "Hear my notes" off: your own part is never played for you; the other hand still is in Full.
+    expect(played('full', false, false)).toEqual([48]);
+    expect(played('mine', false, false)).toEqual([]);
   });
 
   it('changes speed without jumping the song position', () => {

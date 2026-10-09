@@ -39,6 +39,8 @@ export interface PlaySettings {
   showNoteNames: boolean;
   /** Show the note after the one to play now (faded on screen, its own colour on the LUMI). */
   showNextNotes: boolean;
+  /** Play your own part quietly as a guide (Full and "My hand" sound), so you hear what to play next. */
+  hearMyNotes: boolean;
   /** Practice view: falling notes, or reading from sheet music. */
   view: 'falling' | 'sheet';
   sheet: {
@@ -114,6 +116,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     fitToKeyboard: true,
     useRecording: true,
     showNextNotes: false,
+    hearMyNotes: true,
     showNoteNames: true,
     view: 'falling',
     sheet: { layout: 'scroll', zoom: 1, keyHints: true, showFalling: false },

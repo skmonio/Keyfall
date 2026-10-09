@@ -236,6 +236,10 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
             <input type="checkbox" disabled={!p.loop} checked={p.speedUpOnClean} onChange={(e) => setPlay((pl) => (pl.speedUpOnClean = e.target.checked))} />
             +5% speed after each clean run
           </label>
+          <label className="row small" style={{ gap: 6 }} title="Play your own part quietly as each note comes up, so you hear what to play next">
+            <input type="checkbox" checked={p.hearMyNotes !== false} onChange={(e) => setPlay((pl) => (pl.hearMyNotes = e.target.checked))} />
+            Hear my notes (guide)
+          </label>
           <label className="row small" style={{ gap: 6 }} title="Show the note after the one to play now: faded on the keyboard, in its own colour on the LUMI">
             <input type="checkbox" checked={p.showNextNotes} onChange={(e) => setPlay((pl) => (pl.showNextNotes = e.target.checked))} />
             Show next notes

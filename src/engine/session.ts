@@ -405,6 +405,12 @@ export class GameSession {
     this.rescheduleFrom(this.clock.now());
   }
 
+  /** Switch the guide (your own part played quietly) on or off mid-song. */
+  setHearMyNotes(on: boolean) {
+    this.settings.hearMyNotes = on;
+    this.rescheduleFrom(this.clock.now());
+  }
+
   /** Your next note to play (the first one not yet played, from now on). */
   nextPlayable(t = this.songTime): Note | undefined {
     const late = (this.settings.windows.good / 1000) * this.clock.rate;
@@ -483,6 +489,7 @@ export class GameSession {
     if (!mine) return mode === 'full' ? 0.8 : 0;
     // Your own part plays quietly as a guide in Full and "My hand" (in Wait mode, as the
     // music reaches each note, so you hear what to play next).
+    if (this.settings.hearMyNotes === false) return 0;
     if (mode === 'full' || mode === 'mine') return this.settings.mode === 'wait' ? 0.3 : 0.35;
     return 0;
   }
