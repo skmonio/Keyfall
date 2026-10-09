@@ -230,6 +230,9 @@ export class SheetView {
 
   /** Screen x of the playhead in the scroll layout (where the music passes by). */
   playheadClientX(): number {
+    // Where the playhead really is (with smooth scrolling it isn't always at exactly PLAYHEAD_AT).
+    const p = this.playhead.getBoundingClientRect();
+    if (p.width || p.height) return p.left + p.width / 2;
     const r = this.host.getBoundingClientRect();
     return r.left + r.width * PLAYHEAD_AT;
   }
@@ -494,21 +497,59 @@ export class SheetView {
     let i = 0;
     while (i + 1 < bar.length && bar[i + 1].rel <= rel + 1e-9) i++;
     const cur = bar[i];
-    const next = bar[i + 1];
+    // Towards the end of a bar, glide on to the next bar's first note (on the same line) rather
+    // than to the bar's end mark: there's a gap at every bar line, and stopping at the mark and
+    // then hopping the gap made the playhead and scrolling lurch once per bar.
+    const barLen = secToQuarter(this.song, m.start + m.duration) - secToQuarter(this.song, m.start);
+    const nm = ms[k + 1];
+    const first = nm ? this.barAnchors[nm.writtenIndex ?? nm.index]?.[0] : undefined;
+    const nextBar = first && first.sys === cur.sys && first.x > cur.x ? { rel: barLen, x: first.x, sys: cur.sys } : undefined;
+    let next = bar[i + 1];
+    if (nextBar && (!next || next.rel >= barLen - 1e-6)) next = nextBar;
     if (!next || next.rel <= cur.rel) return { x: cur.x, sys: cur.sys };
-    return { x: cur.x + ((rel - cur.rel) / (next.rel - cur.rel)) * (next.x - cur.x), sys: cur.sys };
+    const f = Math.min(1, (rel - cur.rel) / (next.rel - cur.rel));
+    return { x: cur.x + f * (next.x - cur.x), sys: cur.sys };
   }
 
   /** Call every frame. */
   update(session: GameSession) {
     if (!this.osmd || !this.anchors.length) return;
     const t = session.songTime;
-    const q = this.position(Math.max(t, 0));
+    const q = this.position(Math.max(t, 0), session.running);
     this.colorNotes(session, t, q);
   }
 
+  /** Highlight the notes to play (now/next colours). Off: the sheet stays plain, like paper. */
+  setShowTargets(on: boolean) {
+    this.showTargets = on;
+  }
+  private showTargets = true;
+
+  // Smooth scrolling. Notation doesn't space notes evenly in time (a half note can take as
+  // much room as an eighth), so following the playhead exactly changes speed at every note,
+  // which looks like a stutter. While playing, the scroll follows it with a critically damped
+  // spring instead; when paused or jumping, it snaps.
+  private scrollX?: number;
+  private scrollV = 0;
+  private lastFrame?: number;
+  private smoothScroll(target: number, smooth: boolean): number {
+    const now = performance.now();
+    const dt = this.lastFrame === undefined ? 0 : Math.min(0.05, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
+    if (!smooth || this.scrollX === undefined || dt === 0 || Math.abs(target - this.scrollX) > this.host.clientWidth * 0.5) {
+      this.scrollX = target;
+      this.scrollV = 0;
+      return target;
+    }
+    const w = 7; // stiffness: how closely it follows (rad/s)
+    const a = w * w * (target - this.scrollX) - 2 * w * this.scrollV;
+    this.scrollV += a * dt;
+    this.scrollX += this.scrollV * dt;
+    return this.scrollX;
+  }
+
   /** Playhead, scrolling and line turns for song time t. Returns the written position. */
-  private position(t: number): number {
+  private position(t: number, smooth = false): number {
     const q = writtenQuarter(this.song, t);
     const { x, sys } = this.locate(t);
     const box = this.systems[sys] ?? { top: 0, bottom: 100 };
@@ -517,7 +558,7 @@ export class SheetView {
     this.playhead.style.height = `${box.bottom - box.top + 16}px`;
 
     if (this.opts.layout === 'scroll') {
-      const offset = x - this.host.clientWidth * PLAYHEAD_AT;
+      const offset = this.smoothScroll(x - this.host.clientWidth * PLAYHEAD_AT, smooth);
       this.inner.style.transform = `translate(${-offset}px, ${-box.top + 30}px)`;
       if (this.sticky && this.stickyInner) {
         // Only needed once the real clef and key signature have scrolled away.
@@ -539,8 +580,10 @@ export class SheetView {
     // Same now/next notes as the keyboard and the LUMI, in the same colours.
     const { now, next } = session.targetNotes();
     const role = new Map<number, string>();
-    for (const n of next) role.set(n.id, this.opts.nextColors[n.hand]);
-    for (const n of now) role.set(n.id, this.opts.colors[n.hand]);
+    if (this.showTargets) {
+      for (const n of next) role.set(n.id, this.opts.nextColors[n.hand]);
+      for (const n of now) role.set(n.id, this.opts.colors[n.hand]);
+    }
     void t;
     for (const sn of this.notes) {
       // With repeats: notes ahead of the playhead show the coming pass (fresh), notes behind it

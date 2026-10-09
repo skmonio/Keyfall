@@ -158,6 +158,16 @@ export function Setup({ song: initial, nav }: { song: Song; nav: Navigate }) {
               ]}
               onChange={(v) => setPlay((pl) => (pl.mode = v))}
             />
+            {p.mode === 'free' && (
+              <div className="col small" style={{ gap: 4, marginTop: 6 }}>
+                <label className="row" style={{ gap: 6 }} title="Off: the music stays put and you move through it yourself">
+                  <input type="checkbox" checked={p.freeAutoScroll} onChange={(e) => setPlay((pl) => (pl.freeAutoScroll = e.target.checked))} /> Auto-scroll
+                </label>
+                <label className="row" style={{ gap: 6 }}>
+                  <input type="checkbox" checked={p.freeShowNotes} onChange={(e) => setPlay((pl) => (pl.freeShowNotes = e.target.checked))} /> Show notes to play
+                </label>
+              </div>
+            )}
           </div>
           <div className="field">
             <label>View</label>

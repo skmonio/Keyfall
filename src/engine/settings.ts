@@ -43,6 +43,10 @@ export interface PlaySettings {
   showNextNotes: boolean;
   /** Play your own part quietly as a guide (Full and "My hand" sound), so you hear what to play next. */
   hearMyNotes: boolean;
+  /** Free play: the music moves along by itself. Off: it stays put and you move it by hand. */
+  freeAutoScroll: boolean;
+  /** Free play: highlight the notes to play (sheet, keyboard, LUMI). */
+  freeShowNotes: boolean;
   /** Practice view: falling notes, or reading from sheet music. */
   view: 'falling' | 'sheet';
   sheet: {
@@ -119,6 +123,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     useRecording: true,
     showNextNotes: false,
     hearMyNotes: true,
+    freeAutoScroll: false,
+    freeShowNotes: false,
     showNoteNames: true,
     view: 'falling',
     sheet: { layout: 'scroll', zoom: 1, keyHints: true, showFalling: false },

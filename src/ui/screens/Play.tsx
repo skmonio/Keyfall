@@ -90,7 +90,11 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
   const askedRef = useRef(false);
   const octaveSentRef = useRef(false);
   const octaveMiss = useRef<{ off: number; count: number } | undefined>(undefined);
-  hintsRef.current = !inSheet || sheetOpts.keyHints;
+  // Free play (by default) shows no notes to play: just the music, like reading from paper.
+  const freeMode = live.play.mode === 'free' && !listening;
+  hintsRef.current = freeMode ? live.play.freeShowNotes : !inSheet || sheetOpts.keyHints;
+  // Free play without auto-scroll: the music stays put and you move through it yourself.
+  const byHand = freeMode && !live.play.freeAutoScroll;
   // MIDI and audio songs have no notation: generate a readable score from their notes.
   const sheetXml = inSheet ? generatedXml : undefined;
 
@@ -197,6 +201,8 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
     });
     // After a hand edit or hand switch, keep the position (and keep playing if we were).
     if (prev && !restartOnRebuild.current) session.seekTo(prev.songTime);
+    // Free play by hand starts on bar 1, not in the lead-in before it.
+    else if (play.mode === 'free' && !play.freeAutoScroll && !listening) session.seekTo(session.rangeStart);
     restartOnRebuild.current = false;
     if (prev && resumeAfterRebuild.current && startedRef.current) session.start();
     resumeAfterRebuild.current = false;
@@ -370,6 +376,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
       .then(() => {
         if (!alive) return;
         sheetRef.current = sv;
+        sv.setShowTargets(!(getSettings().play.mode === 'free' && !listenRef.current) || getSettings().play.freeShowNotes);
         if (import.meta.env.DEV) Object.assign(window, { __sheet: sv });
         const moved = session.song.notes.some((n) => n.origPitch !== undefined);
         setSheetInfo(
@@ -411,7 +418,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
       nextColors: st.nextColors,
       showFingers: st.play.showFingers,
       lookAheadSec: st.play.lookAheadSec,
-      hints: !sheet || st.play.sheet.keyHints,
+      hints: st.play.mode === 'free' && !listenRef.current ? st.play.freeShowNotes : !sheet || st.play.sheet.keyHints,
       highway: !sheet || st.play.sheet.showFalling,
       // Practising one hand: the other hand is hidden (it may still be auto-played).
       // While listening first, everything is shown.
@@ -428,7 +435,8 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
     r.rezoom(fitRef.current?.lockView ? [fitRef.current.plan.lo, fitRef.current.plan.hi] : undefined);
     sheetRef.current?.setShowFingers(getSettings().play.showFingers);
     sheetRef.current?.setShowNames(getSettings().play.showNoteNames);
-  }, [view, sheetOpts.keyHints, sheetOpts.showFalling, live.play.showFingers, live.play.showNoteNames, listening, sessionGen]);
+    sheetRef.current?.setShowTargets(!freeMode || live.play.freeShowNotes);
+  }, [view, sheetOpts.keyHints, sheetOpts.showFalling, live.play.showFingers, live.play.showNoteNames, listening, sessionGen, freeMode, live.play.freeShowNotes]);
 
   // Change hands mid-song: rebuild the session at the same place (the score starts again).
   // Switch practice/perform mid-song: rebuild at the same place, and keep playing if we were.
@@ -598,13 +606,34 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
   };
   const toggle = () => {
     const s = sessionRef.current;
-    if (!s) return;
+    if (!s || byHand) return;
     if (!startedRef.current || !s.running) start();
     else s.pause();
   };
   const restart = () => {
     sessionRef.current?.restart();
-    start();
+    if (byHand) sessionRef.current?.seekTo(sessionRef.current.rangeStart);
+    else start();
+  };
+  // Mouse wheel / trackpad moves through the music while it isn't playing (e.g. Free play by hand).
+  const onWheel = (e: React.WheelEvent) => {
+    const s = sessionRef.current;
+    if (!s || s.running) return;
+    // Page and lines layouts scroll the page itself.
+    if (inSheet && sheetOpts.layout !== 'scroll') return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d) return;
+    const sv = inSheet ? sheetRef.current : null;
+    let t: number | undefined;
+    if (sv) {
+      const box = e.currentTarget.getBoundingClientRect();
+      t = sv.timeAt(sv.playheadClientX() + d, box.top + box.height / 3, s.songTime)?.t;
+    }
+    if (t === undefined) {
+      const beat = 60 / (song.tempos[0]?.bpm ?? 100);
+      t = s.songTime + (d / 100) * beat; // ~100 px of scrolling per beat
+    }
+    s.seekTo(Math.max(s.rangeStart - s.leadIn, Math.min(s.rangeEnd, t)));
   };
   const exit = () => nav({ name: 'setup', song });
   const setSpeed = (v: number) => {
@@ -723,12 +752,32 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             className={!listening && live.play.mode === 'free' ? 'on' : ''}
             onClick={() => switchMode('free')}
             disabled={!!lesson}
-            title="Free play: the music moves along and you play with it. Nothing is judged or scored."
+            title="Free play: just the music and you. Nothing is judged or scored; it only moves if you turn on Auto-scroll."
           >
             Free
           </button>
           <button className={listening ? 'on' : ''} onClick={() => toggleListen(!listening)}>🎧 Listen</button>
         </div>
+        {freeMode && (
+          <>
+            <label className="row small" style={{ gap: 4 }} title="The music moves along by itself at the chosen speed. Off: it stays put and you move through it (drag, scroll, ←/→).">
+              <input
+                type="checkbox"
+                checked={live.play.freeAutoScroll}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  updateSettings((x) => (x.play.freeAutoScroll = v));
+                  if (!v) sessionRef.current?.pause();
+                  else startedRef.current = false; // shows Start, so it begins when you're ready
+                }}
+              />{' '}
+              Auto-scroll
+            </label>
+            <label className="row small" style={{ gap: 4 }} title="Highlight the notes to play on the sheet, the keyboard and the LUMI">
+              <input type="checkbox" checked={live.play.freeShowNotes} onChange={(e) => updateSettings((x) => (x.play.freeShowNotes = e.target.checked))} /> Show notes to play
+            </label>
+          </>
+        )}
         <div className="seg" title="Which hand(s) you play. Switch any time: you stay at the same place in the music.">
           {(['left', 'both', 'right'] as const).map((h) => (
             <button key={h} className={live.play.hands === h ? 'on' : ''} onClick={() => switchHands(h)}>
@@ -796,9 +845,11 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
         <button onClick={() => sessionRef.current?.seekBars(-1)} title="Back a bar (←)">⏮</button>
         <button onClick={() => sessionRef.current?.seekBars(1)} title="Forward a bar (→)">⏭</button>
         <button onClick={restart} title="Restart (R)">↺</button>
-        <button className="primary" onClick={toggle} title="Play / pause (Space)">
-          {hud.running ? '❚❚' : '▶'}
-        </button>
+        {!byHand && (
+          <button className="primary" onClick={toggle} title="Play / pause (Space)">
+            {hud.running ? '❚❚' : '▶'}
+          </button>
+        )}
       </div>
       <Progress
         progress={hud.progress}
@@ -807,12 +858,13 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
       />
       <SysexFix compact />
       <KeyboardMismatch compact />
-      <div className="play-body">
+      <div className="play-body" onWheel={onWheel}>
         {/* Things that come and go during a song float here, so the toolbar never changes size
             (a changing toolbar resizes the canvas, which made the notes stutter). */}
         <div className="play-status">
           {hud.waiting && <span className="pill warn">Waiting for you…</span>}
-          {quietPause && hud.started && !hud.running && (
+          {byHand && <span className="pill">Free play · drag the music, scroll, or ←/→ to move through it</span>}
+          {quietPause && hud.started && !hud.running && !byHand && (
             <button className="primary" onClick={() => start()} title="Play from here (Space)">
               ▶ Play from here
             </button>
@@ -870,7 +922,7 @@ export function Play({ song, lesson, nav }: { song: Song; lesson?: LessonStep; n
             </div>
           </div>
         )}
-        {!runningNow && !finding && !(quietPause && hud.started) && (
+        {!runningNow && !finding && !byHand && !(quietPause && hud.started) && (
           <div className="overlay">
             <div className="box col">
               {!hud.started ? (
